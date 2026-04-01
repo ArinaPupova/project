@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+requests
+beautifulsoup4
+lxml
+natasha
+transformers
+torch
+pymorphy2
+pydantic
+apscheduler
+python-multipart

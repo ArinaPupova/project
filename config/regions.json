@@ -1,0 +1,26 @@
+{
+  "kurgan": {
+    "name": "Курганская область",
+    "url": "https://ria.ru/location_Kurganskaja_oblast"
+  },
+  "sverdlovsk": {
+    "name": "Свердловская область",
+    "url": "https://ria.ru/location_Sverdlovskaja_oblast"
+  },
+  "tumen":{
+    "name":"Тюменская область",
+    "url":"https://ria.ru/Tyumen_obl"
+  },
+  "chelyabinsk":{
+    "name":"Челябинская область",
+    "url":"https://ria.ru/chelyabinsk_obl"
+  },
+  "hmao":{
+    "name":"Ханты-Мансийский АО",
+    "url":"https://ria.ru/Yugra_reg"
+  },
+  "yanao":{
+    "name":"Ямало-Ненецкий АО",
+    "url":"https://ria.ru/Yanao"
+  }
+}
