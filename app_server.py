@@ -276,7 +276,7 @@ def parse_and_analyze_article(url, basic_info, region_id):
                 'score': avg_score
             }
             
-        sentiment_res = sentiment_res['label']
+        #sentiment_res = sentiment_res['label']
         
         found_locs = extract_locations(text) # нахождение топонимов
         matched_results = match_locations_with_dictionary(found_locs) # поиск их в газетире. находит и добавляет координаты и ранг
