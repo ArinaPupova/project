@@ -132,19 +132,21 @@ function App() {
   useEffect(() => {
     if (vectorLayerRef.current) {
       vectorLayerRef.current.setStyle(getClusterStyle);
+      vectorLayerRef.current.changed();
     }
   }, [calcMethod, getClusterStyle]);
 
   // Загрузка данных
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (force = false) => {
     try {
       // Шаг 1: Проверяем метку времени на сервере
       const checkRes = await fetch(`${API_BASE}/last-update`);
       const checkData = await checkRes.json();
       
+      
       // Если время на сервере совпадает с тем, что мы уже загрузили — выходим
-      if (lastTimestamp === checkData.last_update) {
-        console.log("Данные на карте актуальны.");
+      if (!force && lastTimestamp === checkData.last_update) {
+        //console.log("Данные на карте актуальны.");
         return;
       }
 
@@ -176,7 +178,7 @@ function App() {
     // Обновление раз в 1 минуту, т.к. теперь не нагружает сервер
     const interval = setInterval(loadData, 1 *60* 1000);
     return () => clearInterval(interval);
-  }, [loadData]);
+  }, [loadData, days]);
 
 
   // Применение фильтров к отображаемым данным
@@ -221,9 +223,9 @@ function App() {
     // Создаем векторный слой
     const vectorLayer = new VectorLayer({
       source: clusterSource,
-      style: clusterStyleFunction,
+      style: getClusterStyle,
       zIndex: 10
-    });
+    });vectorLayerRef.current = vectorLayer;
 
     // Создаем Overlay для всплывающего окна
     popupOverlay.current = new Overlay({
