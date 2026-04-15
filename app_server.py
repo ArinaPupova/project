@@ -26,6 +26,7 @@ from natasha import (
     Segmenter, MorphVocab, NewsEmbedding, NewsNERTagger, Doc
 )
 from transformers import pipeline
+from collections import Counter
 
 # --- Конфигурация путей ---
 BASE_DIR = Path(__file__).parent
@@ -144,17 +145,17 @@ def find_new_items(region_id, items):
     last_seen = datetime.fromisoformat(last_seen_str) if last_seen_str else None
 
     items.sort(key=lambda x: x["date"])
-    new_items = []
-    for item in items:
-        if last_seen is None or item["date"] > last_seen:
-            new_items.append(item)
+    # new_items = []
+    # for item in items:
+    #     if last_seen is None or item["date"] > last_seen:
+    #         new_items.append(item)
 
-    if new_items:
-        newest_date = max(i["date"] for i in new_items)
-        state["last_seen_date"] = newest_date.isoformat()
-        save_state(region_id, state)
+    # if new_items:
+    #     newest_date = max(i["date"] for i in new_items)
+    #     state["last_seen_date"] = newest_date.isoformat()
+    #     save_state(region_id, state)
 
-    return new_items
+    return [i for i in items if last_seen is None or i["date"] > last_seen]
 
 # обработка текста 
 
@@ -242,44 +243,46 @@ def parse_and_analyze_article(url, basic_info, region_id):
             print(f"[INFO] Текст не найден: {url}")
             return None
 
-        #sentiment_res = ml_models["sentiment"](text[:512])[0]
-        
-        # Анализ тональности для новости больше 512 символов
+       # --- 1. АНАЛИЗ ТОНАЛЬНОСТИ (ГОЛОСОВАНИЕ БОЛЬШИНСТВОМ) ---
         chunk_size = 512
-        # Режем текст на куски по 512 символов
         chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
 
-        scores = []
         labels = []
+        scores_map = [] 
 
         for chunk in chunks:
             try:
-                # Анализируем каждый кусочек
                 res = ml_models["sentiment"](chunk)[0]
-                scores.append(res['score'])
                 labels.append(res['label'])
+                scores_map.append(res)
             except Exception as e:
                 print(f"Ошибка анализа чанка: {e}")
 
         if not labels:
-            # Если вдруг не удалось проанализировать ни одного куска
             sentiment_res = {"label": "NEUTRAL", "score": 0.0}
         else:
-            # 1. Определяем самую частую метку
-            final_label = max(set(labels), key=labels.count)
+            # ищем самый частый лейбл
+            occurence_count = Counter(labels)
+            final_label = occurence_count.most_common(1)[0][0]
             
-            # 2. Считаем среднюю уверенность среди всех кусков
-            avg_score = sum(scores) / len(scores)
+            # Средняя уверенность только для победившего лейбла
+            relevant_scores = [item['score'] for item in scores_map if item['label'] == final_label]
+            avg_score = sum(relevant_scores) / len(relevant_scores)
             
-            sentiment_res = {
-                'label': final_label,
-                'score': avg_score
-            }
-            
-        #sentiment_res = sentiment_res['label']
+            sentiment_res = {'label': final_label, 'score': avg_score}
         
-        found_locs = extract_locations(text) # нахождение топонимов
-        matched_results = match_locations_with_dictionary(found_locs) # поиск их в газетире. находит и добавляет координаты и ранг
+        # --- 2. ИЗВЛЕЧЕНИЕ ЛОКАЦИЙ И ФИЛЬТРАЦИЯ ТЕГОВ ---
+        found_locs = extract_locations(text) 
+        matched_results = match_locations_with_dictionary(found_locs) 
+
+        # Очистка тегов от географии (чтобы не дублировать локации в тегах)
+        clean_tags = []
+        for tag in tags: # tags здесь — это те, что мы собрали выше через soup.find_all
+            normalized_tag = normalize_location_phrase(tag).lower()
+            if normalized_tag not in place_index:
+                clean_tags.append(tag)
+        tags = clean_tags # подменяем исходный список отфильтрованным
+        
 
         if matched_results:
             max_current_rang = max((loc['rang'] for loc in matched_results if loc['rang'] is not None), default=None)
@@ -294,8 +297,9 @@ def parse_and_analyze_article(url, basic_info, region_id):
                     try:
                         with open(file_name, "r", encoding="utf-8") as f:
                             geojson_data = json.load(f)
-                    except Exception:
-                        pass
+                    except: pass
+                    
+                new_features_added = False
 
                 # формируем геоджсон        
                 for loc in top_locations:
@@ -330,39 +334,45 @@ def parse_and_analyze_article(url, basic_info, region_id):
                     
                     if not is_duplicate:
                         geojson_data.setdefault("features", []).append(feature)
+                        new_features_added = True
                         
-                with open(file_name, "w", encoding="utf-8") as f:
-                    json.dump(geojson_data, f, ensure_ascii=False, indent=4)
-                print(f"[DEBUG] Сохранен анализ в {region_id}.geojson: {title[:30]}")
+                if new_features_added:        
+                    with open(file_name, "w", encoding="utf-8") as f:
+                        json.dump(geojson_data, f, ensure_ascii=False, indent=4)
+                    print(f"[DEBUG] Сохранен анализ в {region_id}.geojson: {title[:30]}")
 
     except Exception as e:
         print(f"[ERROR] Ошибка анализа {url}: {e}")
 
 def job_parse_news():
-    print(f"\n[{datetime.now().isoformat()}] === Запуск проверки новых новостей ===")
+    global LAST_UPDATE_TIME
+    print(f"\n[{datetime.now().isoformat()}] === Запуск проверки ===")
     regions = load_regions()
+    has_new_data = False
     
-    # обход регионов 
     for region_id, config in regions.items():
         url = config.get("url")
         if not url: continue
         
-        # поиск новых. сначала собирает всё, что видит, а потом сравнивает с теми, что видел уже. оставляет те, которых нет на карте
-        print(f"[DEBUG] Проверка региона: {region_id}")
         items = parse_region_page(region_id, url)
         new_items = find_new_items(region_id, items)
-        
-        # запускаем всё, что наделали ссылка-текст-анализ тона-координаты-джейсон
-        if new_items:
-            print(f"[DEBUG] {region_id} - найдено {len(new_items)} новых новостей. Начинаю поштучный анализ...")
-            for idx, item in enumerate(new_items, 1):
-                print(f"  [{idx}/{len(new_items)}] Анализ: {item['title'][:60]}...")
-                parse_and_analyze_article(item["url"], item, region_id)
-        else:
-            print(f"[DEBUG] {region_id} - новых новостей нет.")
-            
-    print(f"[{datetime.now().isoformat()}] === Цикл проверки полностью завершен ===\n")
 
+
+        if new_items:
+            print(f"[DEBUG] {region_id} - найдено {len(new_items)} новостей.")
+            for item in new_items:
+                # 2. Обработка
+                parse_and_analyze_article(item["url"], item, region_id)
+            
+            # 3. Только после успешного цикла обработки сохраняем состояние
+            newest_date = max(i["date"] for i in new_items)
+            save_state(region_id, {"last_seen_date": newest_date.isoformat()})
+            has_new_data = True
+            
+    if has_new_data:
+        LAST_UPDATE_TIME = datetime.now().isoformat()
+        print(f"[*] Время обновления карты изменено: {LAST_UPDATE_TIME}")
+        
 #  Жизненный цикл FastAPI      
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -400,6 +410,7 @@ async def lifespan(app: FastAPI):
     ml_models.clear() # очищает оперативку от моделей
 
 app = FastAPI(lifespan=lifespan)
+LAST_UPDATE_TIME = datetime.now().isoformat()
 
 app.add_middleware(
     CORSMiddleware,
@@ -410,6 +421,12 @@ app.add_middleware(
 )
 
 # --- API Endpoints ---
+
+@app.get("/api/last-update")
+async def get_last_update():
+    """Возвращает время последнего успешного завершения цикла парсинга"""
+    return {"last_update": LAST_UPDATE_TIME}
+        
 @app.get("/api/news") 
 async def get_news(
     days: int = Query(5, description="Сколько дней назад брать новости"),
@@ -479,6 +496,7 @@ async def get_all_tags():
             pass
 
     return list(tags_set)
+
 
 if __name__ == "__main__":
     pass

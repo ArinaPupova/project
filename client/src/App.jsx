@@ -14,7 +14,7 @@ import { Style, Circle as CircleStyle, Fill, Stroke, Text } from 'ol/style';
 import Overlay from 'ol/Overlay';
 import { useGeographic } from 'ol/proj';
 
-useGeographic(); // Упрощает работу с координатами (оставляем Lon, Lat)
+useGeographic(); 
 
 const API_BASE = "/api";
 
@@ -67,6 +67,7 @@ function App() {
   const popupElement = useRef();
   const popupOverlay = useRef();
   const vectorSourceRef = useRef(new VectorSource());
+  const vectorLayerRef = useRef();
 
   const [loading, setLoading] = useState(true);
   const [news, setNews] = useState([]);
@@ -82,31 +83,98 @@ function App() {
   });
   const [selectedTags, setSelectedTags] = useState([]);
 
+  const [lastTimestamp, setLastTimestamp] = useState(null);
+  
+  // 1. Добавляем состояние в начало компонента App
+  const [calcMethod, setCalcMethod] = useState('simple'); // 'simple' или 'weighted'
+
+  // 2. Обновляем функцию стиля (теперь она внутри App или использует внешние параметры)
+  const getClusterStyle = useCallback((feature) => {
+    const size = feature.get('features').length;
+    const features = feature.get('features');
+    
+    let color = COLORS.NEUTRAL;
+
+    if (size === 1) {
+      const sentiment = (features[0].get('sentiment') || "NEUTRAL").toUpperCase();
+      color = COLORS[sentiment] || COLORS.NEUTRAL;
+    } else {
+      const sentiments = features.map(f => (f.get('sentiment') || "NEUTRAL").toUpperCase());
+      
+      // Выбор коэффициентов
+      const weights = calcMethod === 'weighted' 
+        ? { POSITIVE: 1.5, NEGATIVE: -2, NEUTRAL: 0 } 
+        : { POSITIVE: 1, NEGATIVE: -1, NEUTRAL: 0 };
+
+      const score = sentiments.reduce((acc, s) => acc + (weights[s] || 0), 0) / size;
+
+      // Пороги окрашивания
+      if (score > 0.3) color = COLORS.POSITIVE;
+      else if (score < -0.3) color = COLORS.NEGATIVE;
+      else color = COLORS.NEUTRAL;
+    }
+
+    return new Style({
+      image: new CircleStyle({
+        radius: size === 1 ? 10 : Math.min(15 + size, 30),
+        stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.5)', width: 2 }),
+        fill: new Fill({ color: color })
+      }),
+      text: new Text({
+        text: size > 1 ? size.toString() : '',
+        fill: new Fill({ color: '#fff' }),
+        font: '600 12px Inter, sans-serif'
+      })
+    });
+  }, [calcMethod]); // Функция пересоздается при смене метода
+
+  // 3. В useEffect, где создается векторный слой, нужно обновлять стиль
+  useEffect(() => {
+    if (vectorLayerRef.current) {
+      vectorLayerRef.current.setStyle(getClusterStyle);
+    }
+  }, [calcMethod, getClusterStyle]);
+
   // Загрузка данных
   const loadData = useCallback(async () => {
     try {
+      // Шаг 1: Проверяем метку времени на сервере
+      const checkRes = await fetch(`${API_BASE}/last-update`);
+      const checkData = await checkRes.json();
+      
+      // Если время на сервере совпадает с тем, что мы уже загрузили — выходим
+      if (lastTimestamp === checkData.last_update) {
+        console.log("Данные на карте актуальны.");
+        return;
+      }
+
+      // Шаг 2: Если время изменилось (или это первая загрузка), качаем данные
       setLoading(true);
-      // Загружаем теги
-      const tagsRes = await fetch(`${API_BASE}/tags`);
+      
+      const [tagsRes, newsRes] = await Promise.all([
+        fetch(`${API_BASE}/tags`),
+        fetch(`${API_BASE}/news?days=${days}`)
+      ]);
+
       const tagsData = await tagsRes.json();
-      setAvailableTags(tagsData);
-
-      // Загружаем новости с учетом фильтра дней
-      const newsRes = await fetch(`${API_BASE}/news?days=${days}`);
       const newsFeatureCollection = await newsRes.json();
-      setNews(newsFeatureCollection.features);
 
+      setAvailableTags(tagsData);
+      setNews(newsFeatureCollection.features);
+      
+      // Запоминаем новую метку времени
+      setLastTimestamp(checkData.last_update);
       setLoading(false);
     } catch (err) {
-      console.error("Ошибка загрузки данных:", err);
+      console.error("Ошибка синхронизации:", err);
       setLoading(false);
     }
-  }, [days]);
+  }, [days, lastTimestamp]); // Важно добавить lastTimestamp в список зависимостей
 
   useEffect(() => {
     loadData();
-    // Обновление раз в 5 минут (чтобы не перегружать)
-    const interval = setInterval(loadData, 5 * 60 * 1000);
+    // Обновление раз в 1 минуту, т.к. теперь не нагружает сервер
+    const interval = setInterval(loadData, 1 *60* 1000);
     return () => clearInterval(interval);
   }, [loadData]);
 
@@ -115,7 +183,7 @@ function App() {
   useEffect(() => {
     if (!news) return;
 
-    // Локальная фильтрация по чекбоксами и тегам (чтобы не трогать бэкенд каждый клик)
+    // Локальная фильтрация по чекбоксами и тегам
     const filteredFeatures = news.filter(f => {
       const sentiment = (f.properties.sentiment || "NEUTRAL").toUpperCase();
       if (!sentimentFilters[sentiment]) return false;
@@ -178,8 +246,8 @@ function App() {
       view: new View({
         center: [90, 60], // Центр на РФ
         zoom: 3.5,
-        minZoom: 2,
-        maxZoom: 18
+        minZoom: 4,
+        maxZoom: 15
       }),
       overlays: [popupOverlay.current]
     });
@@ -276,6 +344,24 @@ function App() {
             </label>
           </div>
         </div>
+        
+      <div className="filter-section">
+        <label className="section-label">Метод оценки кластера</label>
+        <div className="method-toggle">
+          <button 
+            className={`method-btn ${calcMethod === 'simple' ? 'active' : ''}`}
+            onClick={() => setCalcMethod('simple')}
+          >
+            Средний эмоциональный фон.
+          </button>
+          <button 
+            className={`method-btn ${calcMethod === 'weighted' ? 'active' : ''}`}
+            onClick={() => setCalcMethod('weighted')}
+          >
+            Взвешенный индекс тональности
+          </button>
+        </div>
+      </div>
 
         {/* Фильтр по тегам */}
         <div className="filter-section" style={{ flex: 1 }}>
@@ -317,7 +403,8 @@ function App() {
               {selectedCluster.slice(0, 10).map((pt, i) => (
                 <div key={i} style={{borderBottom: i !== Math.min(selectedCluster.length, 10) - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none', paddingBottom: '12px'}}>
                   <div className={`popup-sentiment sentiment-${(pt.sentiment || "NEUTRAL").toLowerCase()}`}>
-                    {(pt.sentiment || "NEUTRAL").toUpperCase()} ({pt.confidence ? pt.confidence.toFixed(2) : "N/A"})
+                    {pt.sentiment === 'POSITIVE' ? 'Позитивная' :
+                      pt.sentiment === 'NEGATIVE' ? 'Негативная' : 'Нейтральная'}
                   </div>
                   
                   <h3 className="popup-title" style={{fontSize: '1rem'}}>{pt.title}</h3>
