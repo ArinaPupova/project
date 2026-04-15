@@ -62,6 +62,7 @@ const clusterStyleFunction = (feature) => {
 };
 
 function App() {
+  const [lastLoadedDays, setLastLoadedDays] = useState(days);
   const mapElement = useRef();
   const mapRef = useRef();
   const popupElement = useRef();
@@ -145,7 +146,7 @@ function App() {
       
       
       // Если время на сервере совпадает с тем, что мы уже загрузили — выходим
-      if (!force && lastTimestamp === checkData.last_update) {
+      if (!force && lastTimestamp === checkData.last_update && days === lastLoadedDays) {
         //console.log("Данные на карте актуальны.");
         return;
       }
@@ -166,12 +167,13 @@ function App() {
       
       // Запоминаем новую метку времени
       setLastTimestamp(checkData.last_update);
+      setLastLoadedDays(days);
       setLoading(false);
     } catch (err) {
       console.error("Ошибка синхронизации:", err);
       setLoading(false);
     }
-  }, [days, lastTimestamp]); // Важно добавить lastTimestamp в список зависимостей
+  }, [days, lastTimestamp,lastLoadedDays]); 
 
   useEffect(() => {
     loadData();
