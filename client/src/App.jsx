@@ -187,12 +187,19 @@ function App() {
   // Применение фильтров к отображаемым данным
   useEffect(() => {
     if (!news) return;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate()-days);
 
     // Локальная фильтрация по чекбоксами и тегам
     const filteredFeatures = news.filter(f => {
+
+      // дата
+      const newdate = new Date(f.properties.date);
+      if (newsDate < cutoffDate) return false;
+      //тон
       const sentiment = (f.properties.sentiment || "NEUTRAL").toUpperCase();
       if (!sentimentFilters[sentiment]) return false;
-
+      // теги
       if (selectedTags.length > 0) {
         const featureTags = f.properties.tags || [];
         const matchesTag = selectedTags.some(tag => featureTags.includes(tag));
@@ -211,7 +218,7 @@ function App() {
     vectorSourceRef.current.clear();
     vectorSourceRef.current.addFeatures(olFeatures);
 
-  }, [news, sentimentFilters, selectedTags]);
+  }, [news, sentimentFilters, selectedTags, days]);
 
   // Инициализация карты
   useEffect(() => {
