@@ -194,7 +194,7 @@ function App() {
     const filteredFeatures = news.filter(f => {
 
       // дата
-      const newdate = new Date(f.properties.date);
+      const newsDate = new Date(f.properties.date);
       if (newsDate < cutoffDate) return false;
       //тон
       const sentiment = (f.properties.sentiment || "NEUTRAL").toUpperCase();
@@ -364,7 +364,7 @@ function App() {
             className={`method-btn ${calcMethod === 'simple' ? 'active' : ''}`}
             onClick={() => setCalcMethod('simple')}
           >
-            Средний эмоциональный фон.
+            Средний эмоциональный фон
           </button>
           <button 
             className={`method-btn ${calcMethod === 'weighted' ? 'active' : ''}`}
@@ -399,7 +399,7 @@ function App() {
       <div 
         ref={popupElement} 
         className={`ol-popup ${selectedCluster ? 'visible' : ''}`}
-        style={{ padding: '0', maxHeight: '400px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
+        style={{ padding: '0', maxHeight: '400px', overflowY: 'auto', display: selectedCluster ? 'flex' : 'none', flexDirection: 'column' }}
       >
         {selectedCluster && (
           <>
