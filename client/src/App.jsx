@@ -62,7 +62,7 @@ const clusterStyleFunction = (feature) => {
 };
 
 function App() {
-  const [lastLoadedDays, setLastLoadedDays] = useState(days);
+  
   const mapElement = useRef();
   const mapRef = useRef();
   const popupElement = useRef();
@@ -77,6 +77,7 @@ function App() {
 
   // Фильтры
   const [days, setDays] = useState(5);
+  const [lastLoadedDays, setLastLoadedDays] = useState(days);
   const [sentimentFilters, setSentimentFilters] = useState({
     POSITIVE: true,
     NEGATIVE: true,
