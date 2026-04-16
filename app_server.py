@@ -34,8 +34,10 @@ CONFIG_PATH = BASE_DIR / "config" / "regions.json"
 STATE_DIR = BASE_DIR / "regions_state"
 GEO_DIR = BASE_DIR / "data" / "geo"
 DICT_PATH = BASE_DIR / "config" / "combined_database.json"
+FEEDBACK_DIR = BASE_DIR / "data" / "feedback"
 
-for folder in [STATE_DIR, GEO_DIR]:
+
+for folder in [STATE_DIR, GEO_DIR, FEEDBACK_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 RU_MONTHS = {
@@ -497,6 +499,21 @@ async def get_all_tags():
 
     return list(tags_set)
 
+# Принимает отзыв пользователя и сохраняет в отдельный JSON-файл
+@app.post("/api/feedback")
+async def save_feedback(data: dict):
+    news_id = data.get("news_id")
+    if not news_id:
+        return {"status": "error", "message": "No news_id"}
+
+   # Создаем имя файла: feedback_ID_TIMESTAMP.json
+    timestamp = int(datetime.now().timestamp())
+    file_name = f"feedback_{news_id}_{timestamp}.json"
+    file_path = FEEDBACK_DIR / file_name
+    
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+    return {"status": "success"}
 
 if __name__ == "__main__":
     pass

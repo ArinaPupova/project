@@ -63,6 +63,7 @@ const clusterStyleFunction = (feature) => {
 
 function App() {
   
+  const [feedbackStatus, setFeedbackStatus] = useState({});
   const mapElement = useRef();
   const mapRef = useRef();
   const popupElement = useRef();
@@ -87,6 +88,30 @@ function App() {
 
   const [lastTimestamp, setLastTimestamp] = useState(null);
   
+  const sendFeedback = async (newsId,type, value) => {
+    setFeedbackStatus(prev => ({ ...prev, [newsId]: 'sending' }));
+    const payload = {
+      news_id: newsId,
+      feedback_type: type, //тип правки
+      suggested_value: value, // Само значение
+      submitted_at: new Date().toISOString()
+    }
+  try {
+    const response = await fetch(`${API_BASE}/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({payload}),
+    });
+
+    if (response.ok) {
+      setFeedbackStatus(prev => ({ ...prev, [newsId]: 'success' }));
+      setTimeout(() => setFeedbackStatus(prev => ({ ...prev, [newsId]: null })), 3000);
+    }
+  } catch (err) {
+    console.error("Ошибка:", err);
+    setFeedbackStatus(prev => ({ ...prev, [newsId]: 'error' }));
+  }};
+
   // 1. Добавляем состояние в начало компонента App
   const [calcMethod, setCalcMethod] = useState('simple'); // 'simple' или 'weighted'
 
@@ -433,8 +458,46 @@ function App() {
                   <a href={pt.url} target="_blank" rel="noreferrer" className="popup-link" style={{marginTop: 0}}>
                     Читать в источнике →
                   </a>
-                </div>
-              ))}
+
+                  <div className="feedback-block" style={{marginTop: '15px', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)'}}>
+                    <p style={{fontSize: '0.8rem', marginBottom: '10px', color: '#94a3b8', fontWeight: '500'}}>Уточнить данные:</p>
+                    
+                    {/* Выбор тональности */}
+                    <div style={{marginBottom: '12px'}}>
+                      <span style={{fontSize: '0.75rem', color: '#cbd5e1'}}>Тональность:</span>
+                      <div style={{display: 'flex', gap: '6px', marginTop: '6px'}}>
+                        <button 
+                          onClick={() => sendFeedback(pt.news_id, 'sentiment', 'POSITIVE')} 
+                          style={{fontSize: '0.65rem', padding: '4px 8px', background: '#035f40', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer'}}
+                        >Позитивная</button>
+                        
+                        <button 
+                          onClick={() => sendFeedback(pt.news_id, 'sentiment', 'NEUTRAL')}
+                          style={{fontSize: '0.65rem', padding: '4px 8px', background: '#f59e0b', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer'}}
+                        >Нейтральная</button>
+                        
+                        <button 
+                          onClick={() => sendFeedback(pt.news_id, 'sentiment','NEGATIVE')} 
+                          style={{fontSize: '0.65rem', padding: '4px 8px', background: '#802307', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer'}}
+                        >Негативная</button>
+                      </div>
+                    </div>
+
+                    {/* Исправление локации */}
+                    <div>
+                      <span style={{fontSize: '0.75rem', color: '#cbd5e1'}}>Локация:</span>
+                      <div style={{marginTop: '6px'}}>
+                        <button 
+                          onClick={() => {
+                            const newLoc = prompt("Введите правильное название места:");
+                            if(newLoc) sendFeedback(pt.news_id, 'location', newLoc);
+                          }} 
+                          style={{fontSize: '0.7rem', padding: '4px 10px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: 'white', cursor: 'pointer', width: '100%'}}
+                        >📍 Уточнить место ({pt.place_name})</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>))}
               {selectedCluster.length > 10 && (
                 <div style={{textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem'}}>и еще {selectedCluster.length - 10} ...</div>
               )}
