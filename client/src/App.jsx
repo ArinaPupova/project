@@ -284,10 +284,10 @@ function App() {
         vectorLayer
       ],
       view: new View({
-        center: [60, 67],
-        zoom: 6,
-        minZoom: 6,
-        maxZoom: 13,
+        center: [67, 60],
+        zoom: 4,
+        minZoom: 4,
+        maxZoom: 11,
         constrainResolution: true // плавный зум
       }),
       overlays: [popupOverlay.current]
