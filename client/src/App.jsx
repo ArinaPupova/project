@@ -284,10 +284,11 @@ function App() {
         vectorLayer
       ],
       view: new View({
-        center: [90, 60], // Центр на РФ
-        zoom: 3.5,
-        minZoom: 4,
-        maxZoom: 15
+        center: [60, 67],
+        zoom: 6,
+        minZoom: 6,
+        maxZoom: 13,
+        constrainResolution: true // плавный зум
       }),
       overlays: [popupOverlay.current]
     });
