@@ -285,9 +285,9 @@ function App() {
       ],
       view: new View({
         center: [67, 60],
-        zoom: 4,
-        minZoom: 4,
-        maxZoom: 11,
+        zoom: 5,
+        minZoom: 5,
+        maxZoom: 10,
         constrainResolution: true // плавный зум
       }),
       overlays: [popupOverlay.current]
