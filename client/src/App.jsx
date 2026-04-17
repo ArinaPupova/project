@@ -90,27 +90,30 @@ function App() {
   
   const sendFeedback = async (newsId,type, value) => {
     setFeedbackStatus(prev => ({ ...prev, [newsId]: 'sending' }));
-    const payload = {
-      news_id: newsId,
-      feedback_type: type, //тип правки
-      suggested_value: value, // Само значение
-      submitted_at: new Date().toISOString()
-    }
-  try {
-    const response = await fetch(`${API_BASE}/feedback`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({payload}),
-    });
+    try {
+      const response = await fetch (`${API_BASE}/feedback`, {
+        method: 'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          news_id: newsId,
+          feedback_type: type, //тип правки
+          suggested_value: value, // Само значение
+          submitted_at: new Date().toISOString()
+        }),
+      });
 
-    if (response.ok) {
-      setFeedbackStatus(prev => ({ ...prev, [newsId]: 'success' }));
-      setTimeout(() => setFeedbackStatus(prev => ({ ...prev, [newsId]: null })), 3000);
+      if (response.ok) {
+        setFeedbackStatus(prev => ({ ...prev, [newsId]: 'success' }));
+        setTimeout(() => setFeedbackStatus(prev => ({ ...prev, [newsId]: null })), 3000); //вернули кнопки через 3 секунды  
+      } else {
+        throw new Error ('Ошибка сервера');
+      }
+    } catch (err){
+      console.error("Ошибка:", err);
+      setFeedbackStatus(prev => ({ ...prev, [newsId]: 'error' }));
+      alert('Не удалось отправить отзыв');
     }
-  } catch (err) {
-    console.error("Ошибка:", err);
-    setFeedbackStatus(prev => ({ ...prev, [newsId]: 'error' }));
-  }};
+  };
 
   // 1. Добавляем состояние в начало компонента App
   const [calcMethod, setCalcMethod] = useState('simple'); // 'simple' или 'weighted'
@@ -440,8 +443,7 @@ function App() {
               {selectedCluster.slice(0, 10).map((pt, i) => (
                 <div key={i} style={{borderBottom: i !== Math.min(selectedCluster.length, 10) - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none', paddingBottom: '12px'}}>
                   <div className={`popup-sentiment sentiment-${(pt.sentiment || "NEUTRAL").toLowerCase()}`}>
-                    {pt.sentiment === 'POSITIVE' ? 'Позитивная' :
-                      pt.sentiment === 'NEGATIVE' ? 'Негативная' : 'Нейтральная'}
+                    {(pt.sentiment || "").toUpperCase() === 'POSITIVE' ? 'Позитивная' : (pt.sentiment || "").toUpperCase() === 'NEGATIVE' ? 'Негативная' : 'Нейтральная'}
                   </div>
                   
                   <h3 className="popup-title" style={{fontSize: '1rem'}}>{pt.title}</h3>
@@ -462,40 +464,58 @@ function App() {
                   <div className="feedback-block" style={{marginTop: '15px', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)'}}>
                     <p style={{fontSize: '0.8rem', marginBottom: '10px', color: '#94a3b8', fontWeight: '500'}}>Уточнить данные:</p>
                     
-                    {/* Выбор тональности */}
-                    <div style={{marginBottom: '12px'}}>
-                      <span style={{fontSize: '0.75rem', color: '#cbd5e1'}}>Тональность:</span>
-                      <div style={{display: 'flex', gap: '6px', marginTop: '6px'}}>
-                        <button 
-                          onClick={() => sendFeedback(pt.news_id, 'sentiment', 'POSITIVE')} 
-                          style={{fontSize: '0.65rem', padding: '4px 8px', background: '#035f40', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer'}}
-                        >Позитивная</button>
-                        
-                        <button 
-                          onClick={() => sendFeedback(pt.news_id, 'sentiment', 'NEUTRAL')}
-                          style={{fontSize: '0.65rem', padding: '4px 8px', background: '#f59e0b', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer'}}
-                        >Нейтральная</button>
-                        
-                        <button 
-                          onClick={() => sendFeedback(pt.news_id, 'sentiment','NEGATIVE')} 
-                          style={{fontSize: '0.65rem', padding: '4px 8px', background: '#802307', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer'}}
-                        >Негативная</button>
+                    {/*успех */}
+                    {feedbackStatus[pt.news_id] === 'success' && (
+                      <div style={{color: '#4ade80', fontSize: '0.85rem', textAlign: 'center', padding: '10px'}}>
+                          Ваше мнение учтено, спасибо!
                       </div>
-                    </div>
+                    )}
 
-                    {/* Исправление локации */}
-                    <div>
-                      <span style={{fontSize: '0.75rem', color: '#cbd5e1'}}>Локация:</span>
-                      <div style={{marginTop: '6px'}}>
-                        <button 
-                          onClick={() => {
-                            const newLoc = prompt("Введите правильное название места:");
-                            if(newLoc) sendFeedback(pt.news_id, 'location', newLoc);
-                          }} 
-                          style={{fontSize: '0.7rem', padding: '4px 10px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: 'white', cursor: 'pointer', width: '100%'}}
-                        >📍 Уточнить место ({pt.place_name})</button>
+                    {/*отправка*/}
+                    {feedbackStatus[pt.news_id] === 'sending' && (
+                      <div style={{color: '#94a3b8', fontSize: '0.85rem', textAlign: 'center', padding: '10px'}}>
+                        Сохранение...
                       </div>
-                    </div>
+                    )}
+                    
+                    {!feedbackStatus[pt.news_id] && (
+                      <>
+                        {/* Выбор тональности */}
+                        <div style={{marginBottom: '12px'}}>
+                          <span style={{fontSize: '0.75rem', color: '#cbd5e1'}}>Тональность:</span>
+                          <div style={{display: 'flex', gap: '6px', marginTop: '6px'}}>
+                            <button 
+                              onClick={() => sendFeedback(pt.news_id, 'sentiment', 'POSITIVE')} 
+                              style={{fontSize: '0.65rem', padding: '4px 8px', background: '#035f40', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer'}}
+                            >Позитивная</button>
+                            
+                            <button 
+                              onClick={() => sendFeedback(pt.news_id, 'sentiment', 'NEUTRAL')}
+                              style={{fontSize: '0.65rem', padding: '4px 8px', background: '#f59e0b', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer'}}
+                            >Нейтральная</button>
+                            
+                            <button 
+                              onClick={() => sendFeedback(pt.news_id, 'sentiment','NEGATIVE')} 
+                              style={{fontSize: '0.65rem', padding: '4px 8px', background: '#802307', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer'}}
+                            >Негативная</button>
+                          </div>
+                        </div>
+
+                        {/* Исправление локации */}
+                        <div>
+                          <span style={{fontSize: '0.75rem', color: '#cbd5e1'}}>Локация:</span>
+                          <div style={{marginTop: '6px'}}>
+                            <button 
+                              onClick={() => {
+                                const newLoc = prompt("Введите правильное название места:");
+                                if(newLoc) sendFeedback(pt.news_id, 'location', newLoc);
+                              }} 
+                              style={{fontSize: '0.7rem', padding: '4px 10px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: 'white', cursor: 'pointer', width: '100%'}}
+                            >📍 Уточнить место ({pt.place_name})</button>
+                          </div>
+                        </div>
+                      </> 
+                    )}
                   </div>
                 </div>))}
               {selectedCluster.length > 10 && (
