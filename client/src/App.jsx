@@ -285,8 +285,8 @@ function App() {
       ],
       view: new View({
         center: [67, 60],
-        zoom: 6,
-        minZoom: 6,
+        zoom: 5,
+        minZoom: 5,
         maxZoom: 10,
         constrainResolution: true // плавный зум
       }),
