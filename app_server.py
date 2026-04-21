@@ -1,5 +1,5 @@
 import os
-# Обходим блокировки и таймауты Hugging Face в РФ
+# Обходим блокировки и таймауты Hugging Face в РФm (круто)
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
