@@ -426,7 +426,7 @@ app.add_middleware(
 
 @app.get("/api/last-update")
 async def get_last_update():
-    """Возвращает время последнего успешного завершения цикла парсинга"""
+    #Возвращает время последнего успешного завершения цикла парсинга
     return {"last_update": LAST_UPDATE_TIME}
         
 @app.get("/api/news") 

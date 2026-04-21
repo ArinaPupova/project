@@ -118,7 +118,7 @@ function App() {
   // 1. Добавляем состояние в начало компонента App
   const [calcMethod, setCalcMethod] = useState('simple'); // 'simple' или 'weighted'
 
-  // 2. Обновляем функцию стиля (теперь она внутри App или использует внешние параметры)
+  // 2. Обновляем функцию стиля
   const getClusterStyle = useCallback((feature) => {
     const size = feature.get('features').length;
     const features = feature.get('features');
@@ -158,7 +158,7 @@ function App() {
     });
   }, [calcMethod]); // Функция пересоздается при смене метода
 
-  // 3. В useEffect, где создается векторный слой, нужно обновлять стиль
+  
   useEffect(() => {
     if (vectorLayerRef.current) {
       vectorLayerRef.current.setStyle(getClusterStyle);
@@ -285,8 +285,8 @@ function App() {
       ],
       view: new View({
         center: [67, 60],
-        zoom: 5,
-        minZoom: 5,
+        zoom: 6,
+        minZoom: 6,
         maxZoom: 10,
         constrainResolution: true // плавный зум
       }),
@@ -352,7 +352,7 @@ function App() {
       {/* Карта */}
       <div ref={mapElement} className="map-container" />
 
-      {/* Панель фильтров (Glassmorphism) */}
+      {/* Панель фильтров */}
       <div className="filter-panel">
         <h2 className="panel-title">Мониторинг новостей УФО</h2>
         
