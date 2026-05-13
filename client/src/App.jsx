@@ -181,7 +181,8 @@ function App() {
       }
 
       // Шаг 2: Если время изменилось (или это первая загрузка), качаем данные
-      setLoading(true);
+      //setLoading(true);
+      if (news.length === 0) setLoading(true); 
       
       const [tagsRes, newsRes] = await Promise.all([
         fetch(`${API_BASE}/tags`),
@@ -197,12 +198,13 @@ function App() {
       // Запоминаем новую метку времени
       setLastTimestamp(checkData.last_update);
       setLastLoadedDays(days);
+
       setLoading(false);
     } catch (err) {
       console.error("Ошибка синхронизации:", err);
       setLoading(false);
     }
-  }, [days, lastTimestamp,lastLoadedDays]); 
+  }, [days, lastTimestamp,lastLoadedDays, news.length]); 
 
   useEffect(() => {
     loadData();
@@ -340,7 +342,7 @@ function App() {
 
   return (
     <>
-      {loading && (
+      {loading && news.length === 0 && ( 
         <div className="loading-overlay">
           <div className="loader"></div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', letterSpacing: '1px' }}>
